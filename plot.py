@@ -10,7 +10,7 @@ for idx, csv_file in enumerate(csv_files):
     fig, ax = plt.subplots(1,1)
     secax = ax.twinx()
     ax.set_title(f'{float( timestep ):.2e} ms')
-    ax.plot(df[' x[cm]'], df['T[K]'])
+    ax.plot(df[' x[cm]'], df['T[K]'], color='black')
     secax.plot(df[' x[cm]'], df['conductivity[-]'], label='cond')
     secax.plot(df[' x[cm]'], df['HeatTransfer[-]'], label='Heat Transfer')
     secax.plot(df[' x[cm]'], df['HeatGain[-]']    , label='Heat Gain')

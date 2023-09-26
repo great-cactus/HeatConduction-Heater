@@ -35,8 +35,7 @@ program heat_conduction
             HeatTrans(i) = h * ( u(i) - T0 )
             gauss = exp( -((i-1)*dx - L/2.) / (L/10.) * ((i-1)*dx - L/2.)/ (L/10.) )
             if ( dt * t <= t_heat ) then
-                write(*,*)i, dt*i, t_heat
-                HeatGain(i) = 5e3 * Th * gauss
+                HeatGain(i) = 1e1 * Th * gauss
             else
                 HeatGain(i) = 0
             end if
@@ -49,7 +48,7 @@ program heat_conduction
         u(:) = new_u(:)
 
         ! Output temperature distribution every 10 steps to a CSV file
-        if ( mod(t, 100) == 0 ) then
+        if ( mod(t, 10) == 0 ) then
             call write_csv(u, conductivity, HeatTrans, HeatGain, n, t, dx)
         end if
     end do
