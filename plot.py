@@ -12,6 +12,7 @@ for idx, csv_file in enumerate(csv_files):
     ax.set_title(f'{float( timestep ):.2e} ms')
     ax.plot(df[' x[cm]'], df['T[K]'], color='black')
     secax.plot(df[' x[cm]'], df['conductivity[-]'], label='cond')
+    secax.plot(df[' x[cm]'], df['radiation[-]']   , label='rad')
     secax.plot(df[' x[cm]'], df['HeatTransfer[-]'], label='Heat Transfer')
     secax.plot(df[' x[cm]'], df['HeatGain[-]']    , label='Heat Gain')
     secax.set_ylabel('Transport')
