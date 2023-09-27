@@ -1,9 +1,9 @@
 import pandas as pd
 import glob
 import matplotlib.pyplot as plt
+#from mpi4py import MPI
 
-csv_files = glob.glob('DATA/*.csv')
-for idx, csv_file in enumerate(csv_files):
+def process_csv_file(csv_file):
     df = pd.read_csv(csv_file)
     timestep = csv_file.split('_')[1][:4]
 
@@ -27,3 +27,22 @@ for idx, csv_file in enumerate(csv_files):
     plt.cla()
     plt.close()
     del fig, ax
+
+if __name__ == '__main__':
+    # Initialize MPI
+    #comm = MPI.COMM_WORLD
+    #rank = comm.Get_rank()
+    #size = comm.Get_size()
+
+    # List all csv files
+    total_files = sum(1 for _ in glob.iglob('DATA/*.csv'))
+
+    # Divide the tasks among processes
+    #tasks_per_process = total_files // size
+    #start_index = rank * tasks_per_process
+    #end_index = (rank + 1) * tasks_per_process if rank != size - 1 else total_files
+
+    # Process the allocated csv files
+    for file_index, csv_file in enumerate(glob.iglob('DATA/*.csv')):
+        #if start_index <= file_index < end_index:
+        process_csv_file(csv_file)
