@@ -1,15 +1,14 @@
 program heat_conduction
     implicit none
     integer, parameter :: n = 200, max_steps = 600000
-    real(8), parameter :: L = 0.1, dx = L / n, dt = 0.0001
-    real(8), parameter :: rho   = 3.2d3  ! density [kg/m3]
-    real(8), parameter :: cp    = 6.6d2  ! heat capacity [J/kg/K]
-    real(8), parameter :: alpha = 2.5d-5 ! thermal diffusivity [m2/s]
-    !real(8), parameter :: ht = 4.65104   ! heat transfer coefficient [W/m2/K]
+    real(8), parameter :: L = 2.85d-2, dx = L / n, dt = 0.0001
+    real(8), parameter :: x_heatMax = 2.45d-2 ! Maximum heating position [m]
+    real(8), parameter :: alpha = 2.5d-5 ! mimicing thermal diffusivity [m2/s]
+    real(8), parameter :: beta  = 0.52 ! mimicing heat transfer coefficient [W/m2/K]
+    real(8), parameter :: gamma = 1.0 ! mimicing emissivity [-]
+    real(8), parameter :: eta   = 1.0 ! mimicing heat generation coefficient [W/m2/K]
     real(8), parameter :: T0 = 300       ! ambient temperature [K]
     real(8), parameter :: sigma  = 5.670374419d-8 ! Stefan-Boltzmann constant [W/m2/K4]
-    real(8), parameter :: epsilon  = 1 ! emissivity
-    real(8), parameter :: hg = 1d5    ! heat gain coefficient [W/m2]
     real(8), parameter :: Wmax  = 100 ! Maximum heater power [W]
     real(8), parameter :: t_Vincr  = 10 ! duration of heater power increase [s]
     real(8), parameter :: t_heat  = 30 ! Heating duration [s]
@@ -17,7 +16,6 @@ program heat_conduction
     real(8) :: Th_coef ! gradient of Th [K/s]
     real(8) :: Th ! The highest temperature [K]
     real(8) :: T04, u4 ! Temperature squared
-    real(8) :: gauss
     real(8) :: conductivity(n), HeatTrans(n), HeatGain(n), radiation(n)
     real(8) :: u(n), new_u(n), x
     integer :: i, t
@@ -42,15 +40,14 @@ program heat_conduction
         end if
         ! Solving the heat conduction differential equation
         do i = 2, n-1
-            ht = heat_trans_coef(u(i)-T0)
+            ht = heat_trans_coef(u(i)-T0, beta)
             conductivity(i) = alpha / dx**2 * ( u(i+1) - 2*u(i) + u(i-1) )
             HeatTrans(i) = ht * ( u(i) - T0 )
             u4  = u(i) * u(i) * u(i) * u(i)
             T04 = T0 * T0 * T0 * T0
-            radiation(i) = sigma * epsilon * ( u4-T04 )
-            gauss = exp( -((i-1)*dx - L/2.) / (L/10.) * ((i-1)*dx - L/2.)/ (L/10.) )
+            radiation(i) = sigma * gamma * ( u4-T04 )
             if ( dt*t <= t_heat ) then
-                HeatGain(i) = hg/rho/cp/dx * Th * gauss
+                HeatGain(i) = eta * Th * gauss( (i-1)*dx, x_heatMax, L/20.0 )
             else
                 HeatGain(i) = 0
             end if
@@ -90,11 +87,17 @@ contains
         end do
         close(10)
     end subroutine write_csv
-    real(8) function heat_trans_coef(dT)
-        real(8), parameter :: C = 0.52 ! coefficient
+    real(8) function heat_trans_coef(dT, C)
         real(8), parameter :: L = 4.5d-3 ! heater diameter [m]
         real(8) :: dT
+        real(8) :: C
 
         heat_trans_coef = 2.51 * C * (dT/L)**(0.25)
     end function heat_trans_coef
+    real(8) function gauss(x, x0, sigma)
+        real(8) :: x     ! position
+        real(8) :: x0    ! center of the gauss distribution
+        real(8) :: sigma ! width of gauss distribution
+        gauss = exp( -(x-x0)*(x-x0) * 0.5 / sigma / sigma )
+    end function gauss
 end program heat_conduction
