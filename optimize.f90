@@ -1,5 +1,18 @@
-program main
+module globalFileName
     implicit none
+    character(len=30) :: csvName, binName
+end module globalFileName
+
+program main
+    use globalFileName
+    implicit none
+    real(8) :: alpha, beta, gamma, eta
+    real(8), allocatable :: highT(:), lowT(:)
+    real(8), allocatable :: highT2(:), lowT2(:), t(:)
+    integer :: arraySize, i
+
+    call heat_conduction(1.0d-5, 1.0d-5, 1.0d-4, 5.0d2, highT, lowT)
+    arraySize = size( highT )
 
 contains
     subroutine correlationFunction(x, y, n, r)
@@ -29,12 +42,13 @@ contains
         r = numerator / denominator
     end subroutine correlationFunction
 
-    subroutine heat_conduction(alpha, beta, gamma, eta, n, highT, lowT)
+    subroutine heat_conduction(alpha, beta, gamma, eta, highT, lowT)
         real(8), intent(in)  :: alpha, beta, gamma, eta ! fitting parameters
-        integer, intelt(in)  :: n ! array size
-        real(8), intent(out) :: highT(n), lowT(n) ! temperature array for fitting
+        real(8), allocatable, intent(out) :: highT(:), lowT(:) ! temperature array for fitting
+        integer, parameter :: atLowT = 123 ! measurement point of lowT
+        integer, parameter :: n = 200 ! array size
         integer, parameter :: max_steps = 800000
-        real(8), parameter :: L = 2.45d-2, dx = L / n, dt = 0.0001
+        real(8), parameter :: L = 2.45d-2, dx = L/n, dt = 0.0001
         real(8), parameter :: T0 = 300       ! ambient temperature [K]
         real(8), parameter :: sigma  = 5.670374419d-8 ! Stefan-Boltzmann constant [W/m2/K4]
         real(8), parameter :: Wmax  = 100 ! Maximum heater power [W]
@@ -48,6 +62,13 @@ contains
         real(8) :: conductivity(n), HeatTrans(n), radiation(n), HeatGain(n)
         real(8) :: u(n), new_u(n)
         integer :: i, t
+
+        allocate( highT(max_steps/nOut) )
+        allocate( lowT(max_steps/nOut) )
+        do i = 1, max_steps/nOut
+            highT(i) = T0
+            lowT(i)  = T0
+        end do
 
         ! Setting initial conditions
         Th_coef = Wmax / t_Vincr
@@ -95,47 +116,96 @@ contains
 
             ! Output temperature distribution every nOut steps to a CSV file
             if ( mod(t, nOut) == 0 ) then
-                call write_csv(u, conductivity, radiation, HeatTrans, HeatGain, n, t, dx, dir)
+                call write_csv(u, conductivity, radiation, HeatTrans, HeatGain, n, t, dx)
+                highT(t/nOut) = u(n)
+                lowT(t/nOut) = u(atLowT)
             end if
         end do
+        ! save fitting parameters
+        call save_data(alpha, beta, gamma, eta, highT, lowT, max_steps/nOut, dt)
     end subroutine heat_conduction
+    real(8) function heat_trans_coef(dT, C)
+        real(8), parameter :: L = 4.5d-3 ! heater diameter [m]
+        real(8) :: dT
+        real(8) :: C
 
-    subroutine save_data(temp, cond, rad, HT, HG, len, timestep, dx, dir)
-        real(8), dimension(len) :: temp, cond, rad, HT, HG
-        character(*) :: dir
-        integer :: i, len, timestep
-        real(8) :: dx
-        character(len=30) :: tmp_timestep
-        character(len=30) :: filename
-        integer :: iounit
+        heat_trans_coef = 2.51 * C * (dT/L)**(0.25)
+    end function heat_trans_coef
+
+    subroutine save_data(alpha, beta, gamma, eta, highT, lowT, len, dt)
+        use globalFileName
+        real(8) :: alpha, beta, gamma, eta
+        real(8) :: dt
+        real(8), dimension(len) :: highT, lowT
+        integer :: i, len
+        integer, parameter :: iounit = 11
         integer :: ierr
+        real(8), dimension(len) :: t
+
+        t(0) = 0
+        do i = 1, len
+            highT(i) = highT(i) - 273.15
+            lowT(i)  = lowT(i) - 273.15
+            if (i /= 1) then
+                t(i) = t(i-1) + dt
+            end if
+        end do
 
         ! Creating a filename using the timestep
-        write(filename, '(A, A,I8.8,A)') dir, '/output_', timestep,  '.bin'
-        filename = trim( adjustl(filename) )
+        write(binName, '(A, A,I8.8,A)') 'BIN/output_.bin'
+        binName = trim( adjustl(binName) )
 
-        open(newunit=iounit, file=filename, form='unformatted')
+        open(unit=iounit, file=binName, form='unformatted')
         if (ierr /= 0) then
-            print *, 'Error opening file:', filename
+            print *, 'Error opening file:', binName
             return
         end if
-        write(iounit) cond, rad, HT, HG
-    end subroutine save_data
+        write(iounit) alpha
+        write(iounit) beta
+        write(iounit) gamma
+        write(iounit) eta
+        write(iounit) t(1:len)
+        write(iounit) lowT(1:len)
+        write(iounit) highT(1:len)
 
-    subroutine write_csv(temp, cond, rad, HT, HG, len, timestep, dx, dir)
+        close(iounit)
+    end subroutine save_data
+    subroutine read_data(alpha, beta, gamma, eta, len, t, lowT, highT)
+        use globalFileName
+        real(8) :: alpha, beta, gamma, eta
+        integer :: len
+        real(8), dimension(len) :: t, lowT, highT
+        integer, parameter :: iounit = 11
+        integer :: ierr
+
+        open(unit=iounit, file=binName, form='unformatted')
+        if (ierr /= 0) then
+            print *, 'Error opening file:', binName
+            return
+        end if
+
+        read(iounit) alpha
+        read(iounit) beta
+        read(iounit) gamma
+        read(iounit) eta
+        read(iounit) t(1:len)
+        read(iounit) lowT(1:len)
+        read(iounit) highT(1:len)
+    end subroutine read_data
+
+    subroutine write_csv(temp, cond, rad, HT, HG, len, timestep, dx)
+        use globalFileName
         real(8), dimension(len) :: temp, cond, rad, HT, HG
-        character(*) :: dir
         integer :: i, len, timestep
         real(8) :: dx
         character(len=30) :: tmp_timestep
-        character(len=30) :: filename
 
         ! Creating a filename using the timestep
-        write(filename, '(A, A,I8.8,A)') dir, '/output_', timestep,  '.csv'
-        filename = trim( adjustl(filename) )
+        write(csvName, '(A,I8.8,A)') 'DATA/output_', timestep,  '.csv'
+        csvName = trim( adjustl(csvName) )
 
         ! Opening the file and writing the data
-        open(unit=10, file=filename, status='unknown')
+        open(unit=10, file=csvName, status='unknown')
         write(10, *) 'x[m],T[degC],conductivity[-],radiation[-],HeatTransfer[-],HeatGain[-]'
         do i = 1, len
             write(10, '(E16.8, A, E16.8, A, E16.8, A, E16.8, A, E16.8, A, E16.8)')&
