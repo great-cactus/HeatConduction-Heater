@@ -220,4 +220,18 @@ contains
         real(8) :: sigma ! width of gauss distribution
         gauss = exp( -(x-x0)*(x-x0) * 0.5 / sigma / sigma )
     end function gauss
+
+    real(8) function rnd()
+        integer :: seedsize, i
+        integer, allocatable :: seed(:)
+
+        call random_seed(size=seedsize)
+        allocate( seed(seedsize) )
+
+        do i = 1, seedsize
+            call system_clock( count=seed(i) )
+        end do
+        call random_seed( put=seed(:) )
+        call random_number(rnd)
+    end function rnd
 end program main
