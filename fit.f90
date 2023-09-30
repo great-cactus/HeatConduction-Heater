@@ -3,10 +3,10 @@ program heat_conduction
     integer, parameter :: n = 200, max_steps = 800000
     real(8), parameter :: L = 2.45d-2, dx = L / n, dt = 0.0001
     real(8), parameter :: x_heatMax = 2.45d-2 ! Maximum heating position [m]
-    real(8), parameter :: alpha = 1.d-5 ! mimicing thermal diffusivity [m2/s]
-    real(8), parameter :: beta  = 1.d-5 ! mimicing heat transfer coefficient [W/m2/K]
-    real(8), parameter :: gamma = 1.0d-4    ! mimicing emissivity [-]
-    real(8), parameter :: eta   = 5.d2 ! mimicing heat generation coefficient [W/m2/K]
+    real(8), parameter :: alpha = 1.2128d-5 ! mimicing thermal diffusivity [m2/s]
+    real(8), parameter :: beta  = 1.2128d-5 ! mimicing heat transfer coefficient [W/m2/K]
+    real(8), parameter :: gamma = 1.2128d-4    ! mimicing emissivity [-]
+    real(8), parameter :: eta   = 606 ! mimicing heat generation coefficient [W/m2/K]
     real(8), parameter :: T0 = 300       ! ambient temperature [K]
     real(8), parameter :: sigma  = 5.670374419d-8 ! Stefan-Boltzmann constant [W/m2/K4]
     real(8), parameter :: Wmax  = 100 ! Maximum heater power [W]

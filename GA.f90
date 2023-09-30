@@ -3,30 +3,40 @@ module ga_module
   public
   real(8), parameter :: mutation_rate = 0.1
   real(8), parameter :: elite_fraction = 0.2
-  integer, parameter :: population = 200
+  integer, parameter :: population = 30
   integer, parameter :: indv_size = 4
-  integer, parameter :: max_gen = 500
+  integer, parameter :: max_gen = 10
 
 contains
-  subroutine run()
+  subroutine runGA()
     integer :: i
     real(8), dimension(max_gen, indv_size)    :: saved_elites
     real(8), dimension(population, indv_size) :: individuals, new_individuals
-    real(8), dimension(indv_size) :: best_individual
+    real(8), dimension(indv_size) :: best_individual, king_of_kings
+    real(8), dimension(population, 3) :: evals
+    real(8), dimension(3) :: cur_best_eval
+    real(8) :: eval_best
 
+    eval_best = 0.0
     call GA_init(individuals, saved_elites)
     do i = 1, max_gen
         print *, i, 'generation'
-        call GA_step(individuals, best_individual, new_individuals)
+        call GA_step(individuals, best_individual, new_individuals, cur_best_eval)
         saved_elites(i, :) = best_individual(:)
+        evals(i, :) = cur_best_eval(:)
         individuals(:, :) = new_individuals(:, :)
+
+        if ( eval_best < cur_best_eval(3) ) then
+            eval_best = cur_best_eval(3)
+            king_of_kings(:) = best_individual(:)
+        end if
     end do
 
     print *, 'Finished running'
-    print *, 'The best individual is'
-    print *, best_individual(:)
+    print *, 'The king of kings is'
+    print *, king_of_kings(:)
 
-  end subroutine run
+  end subroutine runGA
 
   subroutine selectRoulette(individuals, eval, selected_invd)
     real(8), dimension(population, indv_size), intent(in) :: individuals
@@ -52,7 +62,7 @@ contains
 
     ! Generate a random number between 0 and total_weight
     w_tot = sum( weight )
-    rnd_num = rnd(1) * w_tot
+    rnd_num = rnd() * w_tot
 
     ! Select the individual based on the random number and weights
     cum_weight = 0.0
@@ -77,16 +87,16 @@ contains
     individuals(1, 3) = 1.0d-4
     individuals(1, 4) = 5.0d2
     do i = 1, population - 10
-        rnd_num = rnd(i)
+        rnd_num = rnd()
         diff_ratio = rnd_num / ( 1.0 - rnd_num )
         individuals(i, 1) = individuals(1, 1) * diff_ratio
-        rnd_num = rnd(i)
+        rnd_num = rnd()
         diff_ratio = rnd_num / ( 1.0 - rnd_num )
         individuals(i, 2) = individuals(1, 2) * diff_ratio
-        rnd_num = rnd(i)
+        rnd_num = rnd()
         diff_ratio = rnd_num / ( 1.0 - rnd_num )
         individuals(i, 3) = individuals(1, 3) * diff_ratio
-        rnd_num = rnd(i)
+        rnd_num = rnd()
         diff_ratio = rnd_num / ( 1.0 - rnd_num )
         individuals(i, 4) = individuals(1, 4) * diff_ratio
     end do
@@ -107,7 +117,7 @@ contains
     integer :: i
 
     do i = 1, indv_size
-        if ( rnd(indv_size) < 0.5 ) then
+        if ( rnd() < 0.5 ) then
             child(i) = parent1(i)
         else
             child(i) = parent2(i)
@@ -119,24 +129,24 @@ contains
     integer :: i, rnd_int
 
     ! alpha
-    rnd_int = rnd(1) * 10
-    mutated_child(1) = rnd(2) * 0.1 ** rnd_int
+    rnd_int = rnd() * 10
+    mutated_child(1) = rnd() * 0.1 ** rnd_int
     ! beta
-    rnd_int = rnd(3) * 10
-    mutated_child(2) = rnd(4) * 0.1 ** rnd_int
+    rnd_int = rnd() * 10
+    mutated_child(2) = rnd() * 0.1 ** rnd_int
     ! gamma
-    rnd_int = rnd(5) * 10
-    mutated_child(3) = rnd(6) * 0.1 ** rnd_int
+    rnd_int = rnd() * 10
+    mutated_child(3) = rnd() * 0.1 ** rnd_int
     ! eta
-    rnd_int = rnd(7) * 10
-    mutated_child(4) = rnd(8) * 10 ** rnd_int
+    rnd_int = rnd() * 10
+    mutated_child(4) = rnd() * 10 ** rnd_int
 
   end subroutine mutation
 
   subroutine get_score(cur_indv, eval)
     use problem
     real(8), dimension(indv_size), intent(in) :: cur_indv
-    real(8), intent(out) :: eval
+    real(8), dimension(3)        , intent(out) :: eval
     real(8), allocatable :: highT(:), lowT(:)
     real(8), dimension(80) :: highTRef = (/39.9,106.6,174.0,236.2 ,293.8 ,348.2 ,399.4 ,&
         &447.7 ,494.7 ,540.4 ,585.5 ,629.8 ,674.1 ,714.3 ,751.4 ,786.7 ,821.9 ,852.5 ,878.3 ,897.6,&
@@ -160,29 +170,34 @@ contains
     call correlationFunction(highTRef, highT, arraySize, evalH)
     call correlationFunction(lowTRef , lowT , arraySize, evalL)
 
-    eval = ( evalH + evalL ) /2.0
+    eval(1) = evalL
+    eval(2) = evalL
+    eval(3) = ( evalH + evalL ) /2.0
   end subroutine get_score
 
   ! One step of GA
-  subroutine GA_step(individuals, best_individual, new_individuals)
+  subroutine GA_step(individuals, best_individual, new_individuals, eval_best)
     real(8), dimension(population, indv_size), intent(in)  :: individuals
     real(8), dimension(population, indv_size), intent(out) :: new_individuals
     real(8), dimension(indv_size)            , intent(out) :: best_individual
-    real(8), dimension(population):: eval
+    real(8), dimension(3)                    , intent(out) :: eval_best
+    real(8), dimension(population, 3):: eval
     real(8), dimension(indv_size) :: parent1, parent2, child, mutated_child, tmp_indv
     integer :: i, j, best_idx
 
     ! Get score
     do i = 1, population
-        call get_score(individuals(i,:), eval(i))
+        print *, 'population', i
+        call get_score(individuals(i,:), eval(i, :))
     end do
     ! Find best individual
-    call find_maxIdx(eval, population, best_idx)
+    call find_maxIdx(eval(:, 3), population, best_idx)
     best_individual(:) = individuals(best_idx, :)
+    eval_best(:) = eval(best_idx, :)
 
     ! Create crossed individual
-    call selectRoulette(individuals, eval, parent1)
-    call selectRoulette(individuals, eval, parent2)
+    call selectRoulette(individuals, eval(:,3), parent1)
+    call selectRoulette(individuals, eval(:,3), parent2)
     call cross(parent1, parent2, child)
 
     ! Next generation
@@ -198,18 +213,17 @@ contains
     end do
   end subroutine GA_step
 
-  real(8) function rnd(mixer)
-    integer :: mixer, seedsize, i
+  real(8) function rnd()
+    integer :: seedsize
     integer, allocatable :: seed(:)
 
-    call random_seed(size=seedsize)
+    ! Setup the seed
+    call random_seed( size=seedsize )
     allocate( seed(seedsize) )
-
-    do i = 1, seedsize
-        call system_clock( count=seed(i) )
-        seed(i) = seed(i) * mixer
-    end do
+    call random_seed( get=seed(:) )
     call random_seed( put=seed(:) )
+    deallocate( seed )
+
     call random_number(rnd)
   end function rnd
 

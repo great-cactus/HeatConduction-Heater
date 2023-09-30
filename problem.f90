@@ -81,7 +81,7 @@ contains
 
         ! Output temperature distribution every nOut steps to a CSV file
         if ( mod(t, nOut) == 0 ) then
-            call write_csv(u, conductivity, radiation, HeatTrans, HeatGain, n, t, dx)
+            !call write_csv(u, conductivity, radiation, HeatTrans, HeatGain, n, t, dx)
             highT(t/nOut) = u(n)
             lowT(t/nOut) = u(atLowT)
         end if
