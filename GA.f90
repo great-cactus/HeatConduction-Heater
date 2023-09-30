@@ -1,11 +1,11 @@
 module ga_module
   implicit none
   public
-  !public :: GA_init, GA_step, arithmetic_sequence_sum, arithmetic_sequence_sum_inverse
   real(8), parameter :: mutation_rate = 0.1
   real(8), parameter :: elite_fraction = 0.2
   integer, parameter :: population = 200
   integer, parameter :: indv_size = 4
+  integer, parameter :: max_gen = 500
 
 contains
   subroutine selectRoulette(individuals, eval, selected_invd)
@@ -39,22 +39,47 @@ contains
     do i = 1, population
         cum_weight = cum_weight + eval(i)
         if (rnd_num <= cum_weight) then
-            do j = 1, indv_size
-                selected_invd(j) = individuals(i, j)
-            end do
+            selected_invd(:) = individuals(i, :)
             exit
         end if
     end do
    end subroutine selectRoulette
 
   ! Initialization of GA
-!  subroutine GA_init(individual_max, save_elite, select_method, mutation, individuals, best_individual)
-!    integer, intent(in) :: individual_max
-!    logical, intent(in), optional :: save_elite
-!    character(len=*), intent(in), optional :: select_method
-!    real, intent(in), optional :: mutation
-!    ! Rest of the code for initialization
-!  end subroutine GA_init
+  subroutine GA_init(individuals, saved_elites)
+    real(8), dimension(max_gen, indv_size)   , intent(out) :: saved_elites
+    real(8), dimension(population, indv_size), intent(out) :: individuals
+    real(8) :: rnd_num, diff_ratio
+    integer :: i, j
+
+    individuals(1, 1) = 1.0d-5
+    individuals(1, 2) = 1.0d-5
+    individuals(1, 3) = 1.0d-4
+    individuals(1, 4) = 5.0d2
+    do i = 1, population - 10
+        rnd_num = rnd(i)
+        diff_ratio = rnd_num / ( 1.0 - rnd_num )
+        individuals(i, 1) = individuals(1, 1) * diff_ratio
+        rnd_num = rnd(i)
+        diff_ratio = rnd_num / ( 1.0 - rnd_num )
+        individuals(i, 2) = individuals(1, 2) * diff_ratio
+        rnd_num = rnd(i)
+        diff_ratio = rnd_num / ( 1.0 - rnd_num )
+        individuals(i, 3) = individuals(1, 3) * diff_ratio
+        rnd_num = rnd(i)
+        diff_ratio = rnd_num / ( 1.0 - rnd_num )
+        individuals(i, 4) = individuals(1, 4) * diff_ratio
+    end do
+    do i = ( population - 10), population
+        call mutation(individuals(i, :))
+    end do
+
+    do i = 1, max_gen
+        do j = 1, indv_size
+            saved_elites(i, j) = 0.0
+        end do
+    end do
+  end subroutine GA_init
 
   subroutine cross(parent1, parent2, child)
     real(8), intent(in)  :: parent1(indv_size), parent2(indv_size)
@@ -92,16 +117,26 @@ contains
     use problem
     real(8), dimension(indv_size), intent(in) :: cur_indv
     real(8), intent(out) :: eval
-    real(8), allocatable :: highT(:), lowT(:), highTRef(:), lowTRef(:)
+    real(8), allocatable :: highT(:), lowT(:)
+    real(8), dimension(80) :: highTRef = (/39.9,106.6,174.0,236.2 ,293.8 ,348.2 ,399.4 ,&
+        &447.7 ,494.7 ,540.4 ,585.5 ,629.8 ,674.1 ,714.3 ,751.4 ,786.7 ,821.9 ,852.5 ,878.3 ,897.6,&
+        &916.7 ,936.5 ,955.9 ,974.8 ,989.9 ,1004.3,1014.0,1023.8,1032.4,1038.5,1042.5,1047.6,1051.4,&
+        &1056.0,1055.3,1056.1,1057.3,1058.6,1061.0,1060.5,1060.7,1061.1,1061.9,1062.4,1063.6,&
+        &1063.3,1062.7,1063.4,1063.4,1062.8,1062.1,1061.4,1056.2,1062.7,1066.7,1065.8,1063.7,&
+        &1063.7,1063.5,1065.4,1064.4,1024.1,971.8 ,922.7 ,877.5 ,837.5 ,799.7 ,765.8 ,737.5 ,710.4,&
+        &684.1 ,658.6 ,634.0 ,611.6 ,590.2 ,570.4 ,551.3 ,532.6 ,516.1 ,499.8/) !,484.3/)
+    real(8), dimension(80) :: lowTRef = (/27.5,35.8,51.3,71.0,93.1,116.8,141.3,166.0,190.3,&
+        &214.5,238.6,262.3,285.1,307.9,329.9,351.5,372.4,392.6,412.2,430.6,448.3,465.3,&
+        &481.5,497.0,511.6,524.6,536.7,547.9,558.0,567.0,575.0,582.2,588.6,594.1,599.0,603.9,608.0,&
+        &611.9,615.3,618.6,621.7,623.9,624.6,626.6,628.7,630.9,633.0,635.2,637.3,639.0,640.6,&
+        &642.1,643.1,644.3,644.6,645.7,647.7,649.2,650.4,651.4,652.5,647.3,634.4,617.6,&
+        &599.0,579.0,559.2,539.8,521.3,503.6,486.9,471.1,456.3,442.2,428.9,416.3,404.2,392.7,&
+        &381.7,371.3/)!,361.6/)
     integer :: arraySize
     real(8) :: evalL, evalH
 
     call heat_conduction(cur_indv(1), cur_indv(2), cur_indv(3), cur_indv(4), highT, lowT)
     arraySize = size( highT )
-    allocate( highTRef(arraySize) )
-    allocate( lowTRef(arraySize) )
-    highTRef(:) = 0.0
-    lowTRef(:) = 0.0
     call correlationFunction(highTRef, highT, arraySize, evalH)
     call correlationFunction(lowTRef , lowT , arraySize, evalL)
 
@@ -110,30 +145,35 @@ contains
 
   ! One step of GA
   subroutine GA_step(individuals, eval, best_individual, new_individuals)
-    real(8), dimension(population, indv_size), intent(in)  :: individuals, eval
+    real(8), dimension(population, indv_size), intent(in)  :: individuals
     real(8), dimension(population, indv_size), intent(out) :: new_individuals
     real(8), dimension(indv_size)            , intent(out) :: best_individual
-    real(8), dimension(indv_size) :: parent1, parent2, child, mutated_child
-    integer :: i, j
+    real(8), dimension(population):: eval
+    real(8), dimension(indv_size) :: parent1, parent2, child, mutated_child, tmp_indv
+    integer :: i, j, best_idx
 
+    ! Get score
+    do i = 1, population
+        call get_score(individuals(i,:), eval(i))
+    end do
+    ! Find best individual
+    call find_maxIdx(eval, population, best_idx)
+    best_individual(:) = individuals(best_idx, :)
+
+    ! Create crossed individual
     call selectRoulette(individuals, eval, parent1)
     call selectRoulette(individuals, eval, parent2)
     call cross(parent1, parent2, child)
 
+    ! Next generation
     do i = 1, population
         if ( i <= indv_size * mutation_rate ) then
-            do j = 1, indv_size
-                new_individuals(i, j) = 0.0
-            end do
+            call mutation( new_individuals(i, :))
         else if ( i <= indv_size * (elite_fraction + mutation_rate)&
             & .and. i > indv_size * mutation_rate ) then
-            do j = 1, indv_size
-                new_individuals(i, j) = best_individual(j)
-            end do
+            new_individuals(i, :) = best_individual(:)
         else
-            do j = 1, indv_size
-                new_individuals(i, j) = child(j)
-            end do
+            new_individuals(i, :) = child(:)
         end if
     end do
   end subroutine GA_step
@@ -153,5 +193,22 @@ contains
     call random_number(rnd)
   end function rnd
 
-end module ga_module
+  subroutine find_maxIdx(array, len, max_idx)
+    real(8), dimension(len), intent(in) :: array
+    integer, intent(in) :: len
+    integer, intent(out) :: max_idx
+    real(8) :: max_val
+    integer :: i
 
+    max_val = array(1)
+    max_idx = 1
+
+    do i = 2, len
+        if ( array(i) > max_idx ) then
+            max_val = array(i)
+            max_idx = i
+        end if
+    end do
+  end subroutine find_maxIdx
+
+end module ga_module
