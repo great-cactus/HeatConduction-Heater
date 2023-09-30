@@ -8,6 +8,26 @@ module ga_module
   integer, parameter :: max_gen = 500
 
 contains
+  subroutine run()
+    integer :: i
+    real(8), dimension(max_gen, indv_size)    :: saved_elites
+    real(8), dimension(population, indv_size) :: individuals, new_individuals
+    real(8), dimension(indv_size) :: best_individual
+
+    call GA_init(individuals, saved_elites)
+    do i = 1, max_gen
+        print *, i, 'generation'
+        call GA_step(individuals, best_individual, new_individuals)
+        saved_elites(i, :) = best_individual(:)
+        individuals(:, :) = new_individuals(:, :)
+    end do
+
+    print *, 'Finished running'
+    print *, 'The best individual is'
+    print *, best_individual(:)
+
+  end subroutine run
+
   subroutine selectRoulette(individuals, eval, selected_invd)
     real(8), dimension(population, indv_size), intent(in) :: individuals
     real(8), dimension(population)           , intent(in) :: eval
@@ -144,7 +164,7 @@ contains
   end subroutine get_score
 
   ! One step of GA
-  subroutine GA_step(individuals, eval, best_individual, new_individuals)
+  subroutine GA_step(individuals, best_individual, new_individuals)
     real(8), dimension(population, indv_size), intent(in)  :: individuals
     real(8), dimension(population, indv_size), intent(out) :: new_individuals
     real(8), dimension(indv_size)            , intent(out) :: best_individual
