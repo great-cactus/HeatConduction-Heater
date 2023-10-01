@@ -1,11 +1,18 @@
 module ga_module
   implicit none
   public
-  real(8), parameter :: mutation_rate = 0.1
-  real(8), parameter :: elite_fraction = 0.2
-  integer, parameter :: population = 30
-  integer, parameter :: indv_size = 4
-  integer, parameter :: max_gen = 10
+  !....
+  !    Here is the user definition parameters
+  !....
+  real(8), parameter :: mutation_rate = 0.1  ! mutation rate
+  real(8), parameter :: elite_fraction = 0.2 ! elite fraction
+  integer, parameter :: population = 30      ! population
+  integer, parameter :: indv_size = 4        ! size of each gene
+  integer, parameter :: max_gen = 50         ! maximum generation
+  integer, parameter :: eval_func_len = 3    ! length of evaluation function array
+  !....
+  !....
+  real(8), dimension(population, eval_func_len) :: evals
 
 contains
   subroutine runGA()
@@ -13,8 +20,7 @@ contains
     real(8), dimension(max_gen, indv_size)    :: saved_elites
     real(8), dimension(population, indv_size) :: individuals, new_individuals
     real(8), dimension(indv_size) :: best_individual, king_of_kings
-    real(8), dimension(population, 3) :: evals
-    real(8), dimension(3) :: cur_best_eval
+    real(8), dimension(eval_func_len) :: cur_best_eval
     real(8) :: eval_best
 
     eval_best = 0.0
@@ -26,8 +32,8 @@ contains
         evals(i, :) = cur_best_eval(:)
         individuals(:, :) = new_individuals(:, :)
 
-        if ( eval_best < cur_best_eval(3) ) then
-            eval_best = cur_best_eval(3)
+        if ( eval_best < cur_best_eval(eval_func_len) ) then
+            eval_best = cur_best_eval(eval_func_len)
             king_of_kings(:) = best_individual(:)
         end if
     end do
@@ -180,8 +186,8 @@ contains
     real(8), dimension(population, indv_size), intent(in)  :: individuals
     real(8), dimension(population, indv_size), intent(out) :: new_individuals
     real(8), dimension(indv_size)            , intent(out) :: best_individual
-    real(8), dimension(3)                    , intent(out) :: eval_best
-    real(8), dimension(population, 3):: eval
+    real(8), dimension(eval_func_len)        , intent(out) :: eval_best
+    real(8), dimension(population, eval_func_len):: eval
     real(8), dimension(indv_size) :: parent1, parent2, child, mutated_child, tmp_indv
     integer :: i, j, best_idx
 
@@ -191,13 +197,13 @@ contains
         call get_score(individuals(i,:), eval(i, :))
     end do
     ! Find best individual
-    call find_maxIdx(eval(:, 3), population, best_idx)
+    call find_maxIdx(eval(:, eval_func_len), population, best_idx)
     best_individual(:) = individuals(best_idx, :)
     eval_best(:) = eval(best_idx, :)
 
     ! Create crossed individual
-    call selectRoulette(individuals, eval(:,3), parent1)
-    call selectRoulette(individuals, eval(:,3), parent2)
+    call selectRoulette(individuals, eval(:,eval_func_len), parent1)
+    call selectRoulette(individuals, eval(:,eval_func_len), parent2)
     call cross(parent1, parent2, child)
 
     ! Next generation
