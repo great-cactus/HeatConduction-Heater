@@ -1,11 +1,12 @@
 program main
   use globalFileName
   use ga_module
+  use problem
   implicit none
   integer :: i
 
   call runGA()
-  call write_csv(evals, population, eval_func_len, "evalL,evalH,evalTot", "eval.csv")
+  call write_bin(evals, population, eval_func_len, "eval.bin")
 contains
   subroutine write_csv(array, numRows, numCols, colName, fileName)
     integer     , intent(in) :: numRows, numCols
@@ -32,4 +33,19 @@ contains
 
     close(ioUnit)
   end subroutine write_csv
+  subroutine write_bin(array, numRows, numCols, fileName)
+    integer     , intent(in) :: numRows, numCols
+    real(8)     , intent(in) :: array(numRows, numCols)
+    character(*), intent(in) :: fileName
+    integer, parameter :: ioUnit = 15
+    integer :: i, j
+    character(20) :: fmt
+
+    open(unit=ioUnit, file=fileName, action='write', status='replace')
+    write(ioUnit, *) numRows
+    write(ioUnit, *) numCols
+    write(ioUnit, *) array
+
+    close(ioUnit)
+  end subroutine write_bin
 end program main

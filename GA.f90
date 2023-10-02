@@ -4,11 +4,11 @@ module ga_module
   !....
   !    Here is the user definition parameters
   !....
-  real(8), parameter :: mutation_rate = 0.1  ! mutation rate
-  real(8), parameter :: elite_fraction = 0.2 ! elite fraction
-  integer, parameter :: population = 30      ! population
+  real(8), parameter :: mutation_rate = 0.5  ! mutation rate
+  real(8), parameter :: elite_fraction = 0.1 ! elite fraction
   integer, parameter :: indv_size = 4        ! size of each gene
-  integer, parameter :: max_gen = 50         ! maximum generation
+  integer, parameter :: population = 10      ! population
+  integer, parameter :: max_gen = 5          ! maximum generation
   integer, parameter :: eval_func_len = 3    ! length of evaluation function array
   !....
   !....
@@ -41,6 +41,9 @@ contains
     print *, 'Finished running'
     print *, 'The king of kings is'
     print *, king_of_kings(:)
+    do i = 1, max_gen
+        print *, evals(i, :)
+    end do
 
   end subroutine runGA
 
@@ -151,8 +154,8 @@ contains
 
   subroutine get_score(cur_indv, eval)
     use problem
-    real(8), dimension(indv_size), intent(in) :: cur_indv
-    real(8), dimension(3)        , intent(out) :: eval
+    real(8), dimension(indv_size)    , intent(in)  :: cur_indv
+    real(8), dimension(eval_func_len), intent(out) :: eval
     real(8), allocatable :: highT(:), lowT(:)
     real(8), dimension(80) :: highTRef = (/39.9,106.6,174.0,236.2 ,293.8 ,348.2 ,399.4 ,&
         &447.7 ,494.7 ,540.4 ,585.5 ,629.8 ,674.1 ,714.3 ,751.4 ,786.7 ,821.9 ,852.5 ,878.3 ,897.6,&
@@ -168,16 +171,25 @@ contains
         &642.1,643.1,644.3,644.6,645.7,647.7,649.2,650.4,651.4,652.5,647.3,634.4,617.6,&
         &599.0,579.0,559.2,539.8,521.3,503.6,486.9,471.1,456.3,442.2,428.9,416.3,404.2,392.7,&
         &381.7,371.3/)!,361.6/)
-    integer :: arraySize
+    integer :: arraySize, max_idx
     real(8) :: evalL, evalH
+    real(8) :: highTMaxRef, lowTMaxRef
+    real(8) :: highTMax, lowTMax
 
     call heat_conduction(cur_indv(1), cur_indv(2), cur_indv(3), cur_indv(4), highT, lowT)
     arraySize = size( highT )
     call correlationFunction(highTRef, highT, arraySize, evalH)
     call correlationFunction(lowTRef , lowT , arraySize, evalL)
+    deallocate( highT )
+    deallocate( lowT )
+
+    !call find_maxIdx(highTRef, arraySize, max_idx)
+    !highTMaxRef = highTRef(max_idx)
+    !call find_maxIdx(lowTRef, arraySize, max_idx)
+    !lowTMaxRef = lowTRef(max_idx)
 
     eval(1) = evalL
-    eval(2) = evalL
+    eval(2) = evalH
     eval(3) = ( evalH + evalL ) /2.0
   end subroutine get_score
 
@@ -208,10 +220,10 @@ contains
 
     ! Next generation
     do i = 1, population
-        if ( i <= indv_size * mutation_rate ) then
+        if ( i <= population * mutation_rate ) then
             call mutation( new_individuals(i, :))
-        else if ( i <= indv_size * (elite_fraction + mutation_rate)&
-            & .and. i > indv_size * mutation_rate ) then
+        else if ( i <= population * (elite_fraction + mutation_rate)&
+            & .and. i > population * mutation_rate ) then
             new_individuals(i, :) = best_individual(:)
         else
             new_individuals(i, :) = child(:)

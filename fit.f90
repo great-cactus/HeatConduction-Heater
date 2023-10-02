@@ -3,16 +3,16 @@ program heat_conduction
     integer, parameter :: n = 200, max_steps = 800000
     real(8), parameter :: L = 2.45d-2, dx = L / n, dt = 0.0001
     real(8), parameter :: x_heatMax = 2.45d-2 ! Maximum heating position [m]
-    real(8), parameter :: alpha = 5.3882d-6 ! mimicing thermal diffusivity [m2/s]
-    real(8), parameter :: beta  = 1.0594d-5 ! mimicing heat transfer coefficient [W/m2/K]
-    real(8), parameter :: gamma = 3.91177d-4    ! mimicing emissivity [-]
-    real(8), parameter :: eta   = 995.47 ! mimicing heat generation coefficient [W/m2/K]
+    real(8), parameter :: alpha = 4.5423d-6 ! mimicing thermal diffusivity [m2/s]
+    real(8), parameter :: beta  = 7.5257d-2 ! mimicing heat transfer coefficient [W/m2/K]
+    real(8), parameter :: gamma = 2.0246d-3 ! mimicing emissivity [-]
+    real(8), parameter :: eta   = 329774.7  ! mimicing heat generation coefficient [W/m2/K]
     real(8), parameter :: T0 = 300       ! ambient temperature [K]
     real(8), parameter :: sigma  = 5.670374419d-8 ! Stefan-Boltzmann constant [W/m2/K4]
     real(8), parameter :: Wmax  = 100 ! Maximum heater power [W]
     real(8), parameter :: t_Vincr  = 20 ! duration of heater power increase [s]
     real(8), parameter :: t_heat  = 60 ! Heating duration [s]
-    integer, parameter :: nOut = 10000 ! Output the results every nOut time step
+    integer, parameter :: nOut = 5000 ! Output the results every nOut time step
     real(8) :: ht
     real(8) :: Th_coef ! gradient of Th [K/s]
     real(8) :: Th ! The highest temperature [K]

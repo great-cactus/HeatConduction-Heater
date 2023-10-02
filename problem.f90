@@ -88,6 +88,7 @@ contains
     end do
     ! save fitting parameters
     call save_data(alpha, beta, gamma, eta, highT, lowT, max_steps/nOut, dt)
+
   end subroutine heat_conduction
 
   real(8) function heat_trans_coef(dT, C)
@@ -159,52 +160,46 @@ contains
     read(iounit) highT(1:len)
   end subroutine read_data
 
-  subroutine write_csv(temp, cond, rad, HT, HG, len, timestep, dx)
-    use globalFileName
-    real(8), dimension(len) :: temp, cond, rad, HT, HG
-    integer :: i, len, timestep
-    real(8) :: dx
-    character(len=30) :: tmp_timestep
+  !subroutine write_csv(temp, cond, rad, HT, HG, len, timestep, dx)
+  !  use globalFileName
+  !  real(8), dimension(len) :: temp, cond, rad, HT, HG
+  !  integer :: i, len, timestep
+  !  real(8) :: dx
+  !  character(len=30) :: tmp_timestep
 
-    ! Creating a filename using the timestep
-    write(csvName, '(A,I8.8,A)') 'DATA/output_', timestep,  '.csv'
-    csvName = trim( adjustl(csvName) )
+  !  ! Creating a filename using the timestep
+  !  write(csvName, '(A,I8.8,A)') 'DATA/output_', timestep,  '.csv'
+  !  csvName = trim( adjustl(csvName) )
 
-    ! Opening the file and writing the data
-    open(unit=10, file=csvName, status='unknown')
-    write(10, *) 'x[m],T[degC],conductivity[-],radiation[-],HeatTransfer[-],HeatGain[-]'
-    do i = 1, len
-        write(10, '(E16.8, A, E16.8, A, E16.8, A, E16.8, A, E16.8, A, E16.8)')&
-        &   dx * (i-1), ',', temp(i)-273.15, ',', cond(i), ',', rad(i), ',',  HT(i), ',', HG(i)
-    end do
-    close(10)
-  end subroutine write_csv
+  !  ! Opening the file and writing the data
+  !  open(unit=10, file=csvName, status='unknown')
+  !  write(10, *) 'x[m],T[degC],conductivity[-],radiation[-],HeatTransfer[-],HeatGain[-]'
+  !  do i = 1, len
+  !      write(10, '(E16.8, A, E16.8, A, E16.8, A, E16.8, A, E16.8, A, E16.8)')&
+  !      &   dx * (i-1), ',', temp(i)-273.15, ',', cond(i), ',', rad(i), ',',  HT(i), ',', HG(i)
+  !  end do
+  !  close(10)
+  !end subroutine write_csv
 
   subroutine correlationFunction(x, y, n, r)
     integer, intent(in)  :: n ! array size
     real(8), intent(in)  :: x(n), y(n)
     real(8), intent(out) :: r ! correlation factor
     real(8) :: sum_x, sum_y, sum_xy, sum_x2, sum_y2
-    real(8) :: numerator, denominator
     integer :: i
 
-    sum_x = 0.0
-    sum_y = 0.0
-    sum_xy = 0.0
-    sum_x2 = 0.0
-    sum_y2 = 0.0
+    sum_x = sum(x)
+    sum_y = sum(y)
+    sum_xy = sum(x * y)
+    sum_x2 = sum(x * x)
+    sum_y2 = sum(y * y)
 
-    do i = 1, n
-        sum_x = sum_x + x(i)
-        sum_y = sum_y + y(i)
-        sum_xy = sum_xy + x(i) * y(i)
-        sum_x2 = sum_x2 + x(i) * x(i)
-        sum_y2 = sum_y2 + y(i) * y(i)
-    end do
+    r = ( n*sum_xy - sum_x*sum_y ) / &
+        sqrt( (n*sum_x2 - sum_x*sum_x) * (n*sum_y2 - sum_y*sum_y) )
 
-    numerator = n*sum_xy - sum_x*sum_y
-    denominator = sqrt((n*sum_x2 - sum_x*sum_x)*(n*sum_y2 - sum_y*sum_y))
-    r = numerator / denominator
+    if ( isnan(r) ) then
+        r = 0
+    end if
   end subroutine correlationFunction
 
   real(8) function gauss(x, x0, sigma)
