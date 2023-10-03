@@ -4,12 +4,12 @@ module ga_module
   !....
   !    Here is the user definition parameters
   !....
-  real(8), parameter :: mutation_rate = 0.5  ! mutation rate
+  real(8), parameter :: mutation_rate = 0.2  ! mutation rate
   real(8), parameter :: elite_fraction = 0.1 ! elite fraction
   integer, parameter :: indv_size = 4        ! size of each gene
-  integer, parameter :: population = 10      ! population
-  integer, parameter :: max_gen = 5          ! maximum generation
-  integer, parameter :: eval_func_len = 3    ! length of evaluation function array
+  integer, parameter :: population = 200     ! population
+  integer, parameter :: max_gen = 100        ! maximum generation
+  integer, parameter :: eval_func_len = 5    ! length of evaluation function array
   !....
   !....
   real(8), dimension(population, eval_func_len) :: evals
@@ -41,21 +41,18 @@ contains
     print *, 'Finished running'
     print *, 'The king of kings is'
     print *, king_of_kings(:)
-    do i = 1, max_gen
-        print *, evals(i, :)
-    end do
 
   end subroutine runGA
 
-  subroutine selectRoulette(individuals, eval, selected_invd)
+  subroutine selectRoulette(individuals, eval, selected_invds)
     real(8), dimension(population, indv_size), intent(in) :: individuals
     real(8), dimension(population)           , intent(in) :: eval
-    real(8), dimension(indv_size)            , intent(out):: selected_invd
+    real(8), dimension(2, indv_size)         , intent(out):: selected_invds
     real(8), dimension(population) :: weight
     real(8) :: w_min
     real(8) :: w_tot
     real(8) :: rnd_num, cum_weight
-    integer :: i, j
+    integer :: i, j, selected_idx
 
     ! Create weight array
     w_min = minval( eval )
@@ -78,7 +75,21 @@ contains
     do i = 1, population
         cum_weight = cum_weight + eval(i)
         if (rnd_num <= cum_weight) then
-            selected_invd(:) = individuals(i, :)
+            selected_invds(1, :) = individuals(i, :)
+            selected_idx = i
+            exit
+        end if
+    end do
+    ! Second one
+    cum_weight = 0.0
+    do i = 1, population
+        if ( i == selected_idx ) then
+            cycle
+        end if
+
+        cum_weight = cum_weight + eval(i)
+        if (rnd_num <= cum_weight) then
+            selected_invds(2, :) = individuals(i, :)
             exit
         end if
     end do
@@ -173,24 +184,42 @@ contains
         &381.7,371.3/)!,361.6/)
     integer :: arraySize, max_idx
     real(8) :: evalL, evalH
-    real(8) :: highTMaxRef, lowTMaxRef
-    real(8) :: highTMax, lowTMax
+    real(8) :: highTMaxRef, lowTMaxRef, highTMax, lowTMax
+    real(8) :: eval_highTMaxDiff, eval_lowTMaxDiff
 
+    ! Get correlation coefficient
     call heat_conduction(cur_indv(1), cur_indv(2), cur_indv(3), cur_indv(4), highT, lowT)
     arraySize = size( highT )
     call correlationFunction(highTRef, highT, arraySize, evalH)
     call correlationFunction(lowTRef , lowT , arraySize, evalL)
+
+    ! Get Maximum temperature differentials
+    call find_maxIdx(highTRef, arraySize, max_idx)
+    highTMaxRef = highTRef(max_idx)
+    call find_maxIdx(lowTRef, arraySize, max_idx)
+    lowTMaxRef = lowTRef(max_idx)
+    if ( isnan(lowT(arraySize)) .or. is_inf(lowT(arraySize)) ) then
+        highTMax = 0.0
+        lowTMax = 0.0
+    else
+        call find_maxIdx(highT, arraySize, max_idx)
+        highTMax = highT(max_idx)
+        call find_maxIdx(lowT, arraySize, max_idx)
+        lowTMax = lowT(max_idx)
+    end if
     deallocate( highT )
     deallocate( lowT )
 
-    !call find_maxIdx(highTRef, arraySize, max_idx)
-    !highTMaxRef = highTRef(max_idx)
-    !call find_maxIdx(lowTRef, arraySize, max_idx)
-    !lowTMaxRef = lowTRef(max_idx)
+    eval_highTMaxDiff = 1.0 - abs( highTMaxRef-highTMax ) / highTMaxRef
+    eval_lowTMaxDiff  = 1.0 - abs( lowTMaxRef-lowTMax ) / lowTMaxRef
 
+    print '(5e12.4)', evalL, evalH, eval_lowTMaxDiff, eval_highTMaxDiff,&
+        & ( evalH + evalL + eval_lowTMaxDiff + eval_highTMaxDiff ) /4.0
     eval(1) = evalL
     eval(2) = evalH
-    eval(3) = ( evalH + evalL ) /2.0
+    eval(3) = eval_lowTMaxDiff
+    eval(4) = eval_highTMaxDiff
+    eval(5) = ( evalH + evalL + eval_highTMaxDiff + eval_lowTMaxDiff ) /4.0
   end subroutine get_score
 
   ! One step of GA
@@ -200,7 +229,8 @@ contains
     real(8), dimension(indv_size)            , intent(out) :: best_individual
     real(8), dimension(eval_func_len)        , intent(out) :: eval_best
     real(8), dimension(population, eval_func_len):: eval
-    real(8), dimension(indv_size) :: parent1, parent2, child, mutated_child, tmp_indv
+    real(8), dimension(2, indv_size) :: parents
+    real(8), dimension(indv_size) :: child, mutated_child, tmp_indv
     integer :: i, j, best_idx
 
     ! Get score
@@ -213,19 +243,22 @@ contains
     best_individual(:) = individuals(best_idx, :)
     eval_best(:) = eval(best_idx, :)
 
-    ! Create crossed individual
-    call selectRoulette(individuals, eval(:,eval_func_len), parent1)
-    call selectRoulette(individuals, eval(:,eval_func_len), parent2)
-    call cross(parent1, parent2, child)
 
     ! Next generation
-    do i = 1, population
+    new_individuals(1, :) = best_individual(:)
+    do i = 2, population
         if ( i <= population * mutation_rate ) then
+            ! Mutate
             call mutation( new_individuals(i, :))
         else if ( i <= population * (elite_fraction + mutation_rate)&
             & .and. i > population * mutation_rate ) then
-            new_individuals(i, :) = best_individual(:)
+            ! Best
+            call selectRoulette(individuals, eval(:,eval_func_len), parents)
+            new_individuals(i, :) = parents(1, :)
         else
+            ! Create crossed individual
+            call selectRoulette(individuals, eval(:,eval_func_len), parents)
+            call cross(parents(1,:), parents(2,:), child)
             new_individuals(i, :) = child(:)
         end if
     end do
@@ -256,7 +289,7 @@ contains
     max_idx = 1
 
     do i = 2, len
-        if ( array(i) > max_idx ) then
+        if ( array(i) > max_val ) then
             max_val = array(i)
             max_idx = i
         end if
