@@ -16,6 +16,7 @@ module ga_module
 
 contains
   subroutine runGA()
+    implicit none
     integer :: i
     real(8), dimension(max_gen, indv_size)    :: saved_elites
     real(8), dimension(population, indv_size) :: individuals, new_individuals
@@ -45,6 +46,7 @@ contains
   end subroutine runGA
 
   subroutine selectRoulette(individuals, eval, selected_invds)
+    implicit none
     real(8), dimension(population, indv_size), intent(in) :: individuals
     real(8), dimension(population)           , intent(in) :: eval
     real(8), dimension(2, indv_size)         , intent(out):: selected_invds
@@ -97,6 +99,7 @@ contains
 
   ! Initialization of GA
   subroutine GA_init(individuals, saved_elites)
+    implicit none
     real(8), dimension(max_gen, indv_size)   , intent(out) :: saved_elites
     real(8), dimension(population, indv_size), intent(out) :: individuals
     real(8) :: rnd_num, diff_ratio
@@ -132,6 +135,7 @@ contains
   end subroutine GA_init
 
   subroutine cross(parent1, parent2, child)
+    implicit none
     real(8), intent(in)  :: parent1(indv_size), parent2(indv_size)
     real(8), intent(out) :: child(indv_size)
     integer :: i
@@ -141,6 +145,7 @@ contains
     end do
   end subroutine cross
   subroutine mutation(mutated_child)
+    implicit none
     real(8), dimension(indv_size) :: mutated_child
     integer :: i, rnd_int
 
@@ -161,6 +166,7 @@ contains
 
   subroutine get_score(cur_indv, eval)
     use myProblem
+    implicit none
     real(8), dimension(indv_size)    , intent(in)  :: cur_indv
     real(8), dimension(eval_func_len), intent(out) :: eval
     real(8), allocatable :: highT(:), lowT(:)
@@ -220,6 +226,8 @@ contains
 
   ! One step of GA
   subroutine GA_step(individuals, best_individual, new_individuals, eval_best)
+    use mpi
+    implicit none
     real(8), dimension(population, indv_size), intent(in)  :: individuals
     real(8), dimension(population, indv_size), intent(out) :: new_individuals
     real(8), dimension(indv_size)            , intent(out) :: best_individual
@@ -228,76 +236,94 @@ contains
     real(8), dimension(2, indv_size) :: parents
     real(8), dimension(indv_size) :: child, mutated_child, tmp_indv
     integer :: i, j, best_idx
+    integer :: ierr, numprocs, myid, istart, iend
+
+    ! initialize MPI process
+    call MPI_INIT(ierr)
+    call MPI_COMM_RANK(MPI_COMM_WORLD, myid    , ierr)
+    call MPI_COMM_SIZE(MPI_COMM_WORLD, numprocs, ierr)
+
+    ! Distribute the work among the processes
+    istart = ( myid * population ) / numprocs + 1
+    iend   = ( (myid +1) * population ) /numprocs
 
     ! Get score
-    do i = 1, population
+    do i = istart, iend
         print *, 'population', i
         call get_score(individuals(i,:), eval(i, :))
     end do
-    ! Find best individual
-    call find_maxIdx(eval(:, eval_func_len), population, best_idx)
-    best_individual(:) = individuals(best_idx, :)
-    eval_best(:) = eval(best_idx, :)
+
+    if (myid == 0) then
+        ! Find best individual
+        call find_maxIdx(eval(:, eval_func_len), population, best_idx)
+        best_individual(:) = individuals(best_idx, :)
+        eval_best(:) = eval(best_idx, :)
 
 
-    ! Next generation
-    new_individuals(1, :) = best_individual(:)
-    do i = 2, population
-        if ( i <= population * mutation_rate ) then
-            ! Mutate
-            call mutation( new_individuals(i, :))
-        else if ( i <= population * (elite_fraction + mutation_rate)&
-            & .and. i > population * mutation_rate ) then
-            ! Best
-            call selectRoulette(individuals, eval(:,eval_func_len), parents)
-            new_individuals(i, :) = parents(1, :)
-        else
-            ! Create crossed individual
-            call selectRoulette(individuals, eval(:,eval_func_len), parents)
-            call cross(parents(1,:), parents(2,:), child)
-            new_individuals(i, :) = child(:)
-        end if
-    end do
+        ! Next generation
+        new_individuals(1, :) = best_individual(:)
+        do i = 2, population
+            if ( i <= population * mutation_rate ) then
+                ! Mutate
+                call mutation( new_individuals(i, :))
+            else if ( i <= population * (elite_fraction + mutation_rate)&
+                & .and. i > population * mutation_rate ) then
+                ! Best
+                call selectRoulette(individuals, eval(:,eval_func_len), parents)
+                new_individuals(i, :) = parents(1, :)
+            else
+                ! Create crossed individual
+                call selectRoulette(individuals, eval(:,eval_func_len), parents)
+                call cross(parents(1,:), parents(2,:), child)
+                new_individuals(i, :) = child(:)
+            end if
+        end do
+    end if
+
+    call MPI_FINALIZE(ierr)
   end subroutine GA_step
 
   subroutine generate_value(a1, a2, value)
-      real(8), intent(in)  :: a1, a2  ! Input values a1 and a2
-      real(8), intent(out) :: value  ! Output value
-      real(8) :: b, sigma, x, random_value  ! Local variables
+    implicit none
+    real(8), intent(in)  :: a1, a2  ! Input values a1 and a2
+    real(8), intent(out) :: value  ! Output value
+    real(8) :: b, sigma, x, random_value  ! Local variables
 
-      ! Calculate the midpoint.
-      b = 0.5 * (a1 + a2)
+    ! Calculate the midpoint.
+    b = 0.5 * (a1 + a2)
 
-      ! Determine the standard deviation based on a1 and a2.
-      sigma = abs(a1 - a2) / 2.0
+    ! Determine the standard deviation based on a1 and a2.
+    sigma = abs(a1 - a2) / 2.0
 
-      ! Generate a random value from the normal distribution.
-      call random_normal(b, sigma, random_value)
+    ! Generate a random value from the normal distribution.
+    call random_normal(b, sigma, random_value)
 
-      ! Weight the random value by the probability density function.
-      x = (random_value - b) / sigma
-      value = random_value * exp(-0.5 * x * x)
+    ! Weight the random value by the probability density function.
+    x = (random_value - b) / sigma
+    value = random_value * exp(-0.5 * x * x)
   end subroutine generate_value
 
   subroutine random_normal(mean, std_dev, value)
-      real(8), intent(in)  :: mean, std_dev  ! Mean and standard deviation
-      real(8), intent(out) :: value  ! Output value
-      real(8) :: u, v, s  ! Local variables
+    implicit none
+    real(8), intent(in)  :: mean, std_dev  ! Mean and standard deviation
+    real(8), intent(out) :: value  ! Output value
+    real(8) :: u, v, s  ! Local variables
 
-      ! Box-Muller transformation to generate a random value
-      ! from a normal distribution.
-      do
-          u = 2.0 * rnd() - 1.0
-          v = 2.0 * rnd() - 1.0
-          s = u*u + v*v
-          if (s .lt. 1.0 .and. s .gt. 0.0) exit  ! Exit loop if conditions are met
-      end do
+    ! Box-Muller transformation to generate a random value
+    ! from a normal distribution.
+    do
+        u = 2.0 * rnd() - 1.0
+        v = 2.0 * rnd() - 1.0
+        s = u*u + v*v
+        if (s .lt. 1.0 .and. s .gt. 0.0) exit  ! Exit loop if conditions are met
+    end do
 
-      ! Calculate the random value based on the Box-Muller transformation.
-      value = std_dev * u * sqrt(-2.0 * log(s) / s) + mean
+    ! Calculate the random value based on the Box-Muller transformation.
+    value = std_dev * u * sqrt(-2.0 * log(s) / s) + mean
   end subroutine random_normal
 
   real(8) function rnd()
+    implicit none
     integer :: seedsize
     integer, allocatable :: seed(:)
 
@@ -312,6 +338,7 @@ contains
   end function rnd
 
   subroutine find_maxIdx(array, len, max_idx)
+    implicit none
     real(8), dimension(len), intent(in) :: array
     integer, intent(in) :: len
     integer, intent(out) :: max_idx
@@ -328,5 +355,4 @@ contains
         end if
     end do
   end subroutine find_maxIdx
-
 end module ga_module
