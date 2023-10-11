@@ -7,7 +7,7 @@ module ga_module
   real(8), parameter :: mutation_rate = 0.2  ! mutation rate
   real(8), parameter :: elite_fraction = 0.1 ! elite fraction
   integer, parameter :: indv_size = 4        ! size of each gene
-  integer, parameter :: population = 200     ! population
+  integer, parameter :: population = 400     ! population
   integer, parameter :: max_gen = 100        ! maximum generation
   integer, parameter :: eval_func_len = 5    ! length of evaluation function array
   !....
@@ -137,11 +137,7 @@ contains
     integer :: i
 
     do i = 1, indv_size
-        if ( rnd() < 0.5 ) then
-            child(i) = parent1(i)
-        else
-            child(i) = parent2(i)
-        end if
+        call generate_value( parent1(i), parent2(i), child(i) )
     end do
   end subroutine cross
   subroutine mutation(mutated_child)
@@ -164,7 +160,7 @@ contains
   end subroutine mutation
 
   subroutine get_score(cur_indv, eval)
-    use problem
+    use myProblem
     real(8), dimension(indv_size)    , intent(in)  :: cur_indv
     real(8), dimension(eval_func_len), intent(out) :: eval
     real(8), allocatable :: highT(:), lowT(:)
@@ -210,8 +206,8 @@ contains
     deallocate( highT )
     deallocate( lowT )
 
-    eval_highTMaxDiff = 1.0 - abs( highTMaxRef-highTMax ) / highTMaxRef
-    eval_lowTMaxDiff  = 1.0 - abs( lowTMaxRef-lowTMax ) / lowTMaxRef
+    eval_highTMaxDiff = 1.0 - abs( highTMaxRef-highTMax ) / max( highTMaxRef, highTMax )
+    eval_lowTMaxDiff  = 1.0 - abs( lowTMaxRef-lowTMax ) / max( lowTMaxRef, lowTMax )
 
     print '(5e12.4)', evalL, evalH, eval_lowTMaxDiff, eval_highTMaxDiff,&
         & ( evalH + evalL + eval_lowTMaxDiff + eval_highTMaxDiff ) /4.0
@@ -263,6 +259,43 @@ contains
         end if
     end do
   end subroutine GA_step
+
+  subroutine generate_value(a1, a2, value)
+      real(8), intent(in)  :: a1, a2  ! Input values a1 and a2
+      real(8), intent(out) :: value  ! Output value
+      real(8) :: b, sigma, x, random_value  ! Local variables
+
+      ! Calculate the midpoint.
+      b = 0.5 * (a1 + a2)
+
+      ! Determine the standard deviation based on a1 and a2.
+      sigma = abs(a1 - a2) / 2.0
+
+      ! Generate a random value from the normal distribution.
+      call random_normal(b, sigma, random_value)
+
+      ! Weight the random value by the probability density function.
+      x = (random_value - b) / sigma
+      value = random_value * exp(-0.5 * x * x)
+  end subroutine generate_value
+
+  subroutine random_normal(mean, std_dev, value)
+      real(8), intent(in)  :: mean, std_dev  ! Mean and standard deviation
+      real(8), intent(out) :: value  ! Output value
+      real(8) :: u, v, s  ! Local variables
+
+      ! Box-Muller transformation to generate a random value
+      ! from a normal distribution.
+      do
+          u = 2.0 * rnd() - 1.0
+          v = 2.0 * rnd() - 1.0
+          s = u*u + v*v
+          if (s .lt. 1.0 .and. s .gt. 0.0) exit  ! Exit loop if conditions are met
+      end do
+
+      ! Calculate the random value based on the Box-Muller transformation.
+      value = std_dev * u * sqrt(-2.0 * log(s) / s) + mean
+  end subroutine random_normal
 
   real(8) function rnd()
     integer :: seedsize

@@ -1,8 +1,17 @@
 program main
   use globalFileName
   use ga_module
-  use problem
+  use myProblem
   implicit none
+  !real(8) :: a, b, c
+  !integer :: i
+
+  !do i = 1, 10
+  !  a = rnd()
+  !  b = rnd()
+  !  call generate_value(a, b, c)
+  !  print *, a, b, c
+  !end do
 
   call runGA()
   call write_bin(evals, population, eval_func_len, "eval.bin")

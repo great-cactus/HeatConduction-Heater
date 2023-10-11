@@ -3,7 +3,7 @@ module globalFileName
   character(len=30) :: csvName, binName
 end module globalFileName
 
-module problem
+module myProblem
   implicit none
   interface is_inf
       module procedure is_inf4
@@ -41,8 +41,8 @@ contains
     end do
 
     ! Setting initial conditions
-    Th_coef = Wmax / t_Vincr
-    Th = 0
+    Th_coef = Wmax / t_Vincr / 2.0
+    Th = Wmax / 2.0
     do i = 1, n
         u(i) = T0
         conductivity(i) = 0
@@ -54,7 +54,7 @@ contains
     ! Time stepping loop
     do t = 1, max_steps
         if ( Th < Wmax ) then
-            Th = Th_coef * dt * t
+            Th = Th_coef * dt * t + ( Wmax / 2.0 )
         else
             Th = Wmax
         end if
@@ -72,11 +72,14 @@ contains
 
             new_u(i) = u(i) + dt * ( conductivity(i) - radiation(i) - HeatTrans(i) )
         end do
-        new_u(1) = T0
+        ! adiabatic boundary
+        new_u(1) = new_u(2)
         if ( dt*t <= t_heat ) then
+            ! Heat flux (heat source) boundary
             HeatGain(n) = eta * Th
-            new_u(n) = new_u(n-1) + eta * Th * dx
+            new_u(n) = new_u(n-1) + eta * Th * dx / alpha
         else
+            ! adiabatic boundary
             HeatGain(n) = 0
             new_u(n) = new_u(n-1)
         end if
@@ -272,4 +275,4 @@ contains
         end if
     end do
   end function is_inf8
-end module problem
+end module myProblem

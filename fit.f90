@@ -1,12 +1,13 @@
 program heat_conduction
     implicit none
-    integer, parameter :: n = 200, max_steps = 800000
+    integer, parameter :: n = 200
     real(8), parameter :: L = 2.45d-2, dx = L / n, dt = 0.0001
-    real(8), parameter :: x_heatMax = 2.45d-2 ! Maximum heating position [m]
-    real(8), parameter :: alpha = 4.5423d-6 ! mimicing thermal diffusivity [m2/s]
-    real(8), parameter :: beta  = 7.5257d-2 ! mimicing heat transfer coefficient [W/m2/K]
-    real(8), parameter :: gamma = 2.0246d-3 ! mimicing emissivity [-]
-    real(8), parameter :: eta   = 329774.7  ! mimicing heat generation coefficient [W/m2/K]
+    real(8), parameter :: max_time = 80 ! second
+    integer, parameter :: max_steps = max_time / dt
+    real(8), parameter :: alpha = 8.5194d-6 ! mimicing thermal diffusivity [m2/s]
+    real(8), parameter :: beta  = 6.129d-4 ! mimicing heat transfer coefficient [W/m2/K]
+    real(8), parameter :: gamma = 1.916d-6 ! mimicing emissivity [-]
+    real(8), parameter :: eta   = 643.06  ! mimicing heat generation coefficient [W/m2/K]
     real(8), parameter :: T0 = 300       ! ambient temperature [K]
     real(8), parameter :: sigma  = 5.670374419d-8 ! Stefan-Boltzmann constant [W/m2/K4]
     real(8), parameter :: Wmax  = 100 ! Maximum heater power [W]
@@ -21,16 +22,18 @@ program heat_conduction
     real(8) :: u(n), new_u(n)
     integer :: i, t
 
+
     ! Setting initial conditions
     Th_coef = Wmax / t_Vincr
-    Th = 0
+    Th = 0.0
     do i = 1, n
         u(i) = T0
-        conductivity(i) = 0
-        HeatTrans(i)    = 0
-        HeatGain(i)     = 0
-        radiation(i)    = 0
+        conductivity(i) = 0.0
+        HeatTrans(i)    = 0.0
+        HeatGain(i)     = 0.0
+        radiation(i)    = 0.0
     end do
+    print *, alpha * dt / dx /dx
 
     ! Time stepping loop
     do t = 1, max_steps
@@ -50,16 +53,10 @@ program heat_conduction
             u4  = u(i) * u(i) * u(i) * u(i)
             T04 = T0 * T0 * T0 * T0
             radiation(i) = sigma * gamma * ( u4-T04 )
-            ! heat gain term
-            !if ( dt*t <= t_heat ) then
-            !    HeatGain(i) = eta * Th * gauss( (i-1)*dx, x_heatMax, L/25.0 )
-            !else
-            !    HeatGain(i) = 0
-            !end if
 
             new_u(i) = u(i) + dt * ( conductivity(i) - radiation(i) - HeatTrans(i) )
         end do
-        new_u(1) = T0
+        new_u(1) = new_u(2)
         if ( dt*t <= t_heat ) then
             HeatGain(n) = eta * Th
             new_u(n) = new_u(n-1) + eta * Th * dx
@@ -73,21 +70,22 @@ program heat_conduction
 
         ! Output temperature distribution every nOut steps to a CSV file
         if ( mod(t, nOut) == 0 ) then
-            call write_csv(u, conductivity, radiation, HeatTrans, HeatGain, n, t, dx)
+            call write_csv(u, conductivity, radiation, HeatTrans, HeatGain, n, t*dt, dx)
         end if
     end do
 contains
     ! Subroutine to write temperature data to a CSV file
     subroutine write_csv(temp, cond, rad, HT, HG, len, timestep, dx)
         real(8), dimension(len) :: temp, cond, rad, HT, HG
-        integer :: i, len, timestep
+        integer :: i, len
+        real(8) :: timestep
         real(8) :: dx
         character(len=30) :: tmp_timestep
         character(len=30) :: filename
 
         ! Creating a filename using the timestep
         !write(tmp_timestep, '(I8)') timestep
-        write(filename, '(A,I8.8,A)') 'DATA/output_', timestep,  '.csv'
+        write(filename, '(A,e13.6,A)') 'DATA/output_', timestep, '.csv'
         filename = trim( adjustl(filename) )
 
         ! Opening the file and writing the data
